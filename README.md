@@ -1,8 +1,8 @@
-# Streaming Pipeline - Pub/Sub para BigQuery
+# Streaming Pipeline - Pub/Sub to BigQuery
 
-Pipeline de streaming em tempo real usando Google Cloud Pub/Sub, Apache Beam (Dataflow) e BigQuery. Arquitetura event-driven com dead-letter queue e monitoramento integrado.
+Real-time streaming pipeline using Google Cloud Pub/Sub, Apache Beam (Dataflow) and BigQuery. Event-driven architecture with dead-letter queue and integrated monitoring.
 
-## Arquitetura
+## Architecture
 
 ```
 +------------------+     +------------------+     +------------------+
@@ -28,18 +28,18 @@ Pipeline de streaming em tempo real usando Google Cloud Pub/Sub, Apache Beam (Da
          +-------------------+     +-------------------+
 ```
 
-## Como Funciona
+## How It Works
 
-1. **Ingestao**: Mensagens JSON publicadas no Pub/Sub topic
-2. **Processamento**: Dataflow pipeline le da subscription
-3. **Validacao**: Schema validation com Pydantic (campos obrigatorios, tipos)
-4. **Windowing**: Agregacao em janelas fixas de 1 minuto
-5. **Escrita**: Mensagens validas -> BigQuery particionada
-6. **DLQ**: Mensagens invalidas -> topico dead-letter para analise
+1. **Ingestion**: JSON messages published to Pub/Sub topic
+2. **Processing**: Dataflow pipeline reads from subscription
+3. **Validation**: Schema validation with Pydantic (required fields, types)
+4. **Windowing**: Aggregation in fixed 1-minute windows
+5. **Write**: Valid messages -> partitioned BigQuery table
+6. **DLQ**: Invalid messages -> dead-letter topic for analysis
 
-## Como Executar
+## Running
 
-### Local (com emulador Pub/Sub)
+### Local (with Pub/Sub emulator)
 ```bash
 docker-compose up -d
 python pipeline/main.py --runner DirectRunner
@@ -54,47 +54,45 @@ python pipeline/main.py \
   --temp_location gs://dataflow-temp/staging
 ```
 
-## Monitoramento
+## Monitoring
 
-O pipeline expoe metricas via Cloud Monitoring:
-- Mensagens processadas/minuto
-- Taxa de erro (% para DLQ)
-- Latencia de processamento (p50, p95, p99)
-- Throughput de escrita no BigQuery
+The pipeline exposes metrics via Cloud Monitoring:
+- Messages processed/minute
+- Error rate (% to DLQ)
+- Processing latency (p50, p95, p99)
+- BigQuery write throughput
 
-Alertas configurados para: taxa de erro > 5%, latencia p95 > 30s, DLQ backlog > 1000 mensagens.
+Alerts configured for: error rate > 5%, p95 latency > 30s, DLQ backlog > 1000 messages.
 
-## Decisoes Tecnicas
+## Technical Decisions
 
-**Por que Dataflow e nao Cloud Functions?** Dataflow (Apache Beam) suporta processamento continuo com windowing, backpressure automatico e exactly-once semantics. Cloud Functions tem timeout de 9 minutos e nao suporta windowing. Para streaming de dados, Dataflow e a escolha correta na GCP.
+**Why Dataflow over Cloud Functions?** Dataflow (Apache Beam) supports continuous processing with windowing, automatic backpressure, and exactly-once semantics. Cloud Functions has a 9-minute timeout and no windowing support. For data streaming, Dataflow is the correct choice on GCP.
 
-**Por que DLQ pattern?** Em producao, mensagens malformadas acontecem. Descartar silenciosamente perde dados. Enviar para DLQ permite: debug, reprocessamento apos correcao, e auditoria. Com retry policy de 5 tentativas antes do DLQ, mensagens transitoriamente invalidas tem chance de recover.
+**Why DLQ pattern?** In production, malformed messages happen. Silently dropping them loses data. Sending to DLQ enables: debugging, reprocessing after fixes, and auditing. With a 5-attempt retry policy before DLQ, transiently invalid messages have a chance to recover.
 
-**Por que Pydantic para validacao?** Pydantic gera erros descritivos, valida tipos automaticamente e permite schemas reutilizaveis. Alternativas como validacao manual em Python sao propensas a erro e dificeis de manter.
+**Why Pydantic for validation?** Pydantic generates descriptive errors, validates types automatically, and allows reusable schemas. Manual validation in Python is error-prone and harder to maintain.
 
-## Estrutura
+## Structure
 
 ```
 streaming-pipeline-pubsub-bigquery/
   pipeline/
-    main.py          # Pipeline Apache Beam
-    schema.py        # Schemas Pydantic
-    config.py        # Configuracoes
+    main.py          # Apache Beam pipeline
+    schema.py        # Pydantic schemas
+    config.py        # Configuration
     utils.py         # Helpers
   terraform/
-    main.tf          # Infra Pub/Sub + BigQuery + Dataflow
+    main.tf          # Pub/Sub + BigQuery + Dataflow infra
     variables.tf
     outputs.tf
   tests/
-    test_pipeline.py # Testes do pipeline
-    test_schema.py   # Testes de validacao
-  monitoring/
-    dashboard.json   # Cloud Monitoring config
+    test_pipeline.py # Pipeline tests
+    test_schema.py   # Validation tests
   .github/
     workflows/
-      ci.yml         # Lint + testes + terraform validate
+      ci.yml         # Lint + test + terraform validate
 ```
 
 ---
 
-**Autor:** Diego Brito
+Author: Diego Brito
